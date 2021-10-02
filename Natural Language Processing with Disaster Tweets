@@ -1,0 +1,61 @@
+# =============================================================================
+# https://www.kaggle.com/c/nlp-getting-started/overview/description
+# 
+# Competition Description
+# 
+# Twitter has become an important communication channel in times of emergency.
+# The ubiquitousness of smartphones enables people to announce an emergency they’re observing in real-time.
+# Because of this, more agencies are interested in programatically monitoring Twitter (i.e. disaster relief organizations and news agencies).
+# But, it’s not always clear whether a person’s words are actually announcing a disaster.
+# =============================================================================
+
+import pandas as pd
+import spacy
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+
+df_train = pd.read_csv('/kaggle/input/nlp-getting-started/train.csv')
+df_test = pd.read_csv('/kaggle/input/nlp-getting-started/test.csv')
+
+# Lemmatization
+
+nlp = spacy.load('en_core_web_sm')
+
+def lemmaF(txt):
+    doc = nlp(txt)
+    lemmatized_txt = ' '.join([token.lemma_ for token in doc if not (token.is_punct\
+                            or token.is_digit\
+                            or token.is_space\
+                            or token.like_num\
+                            or token.like_url\
+                            or token.like_email\
+                            or token.lemma_ == '-PRON-')])
+    return lemmatized_txt
+
+df_train['lemma'] = df_train['text'].apply(lemmaF)
+df_test['lemma'] = df_test['text'].apply(lemmaF)
+
+# Training
+
+X_train = df_train['lemma']
+y_train = df_train['target']
+X_test = df_test['lemma']
+
+tfidf = TfidfVectorizer()
+tfidf.fit(X_train)
+X_train_TV = tfidf.transform(X_train)
+X_test_TV = tfidf.transform(X_test)
+
+model = LogisticRegression()
+model.fit(X_train_TV, y_train)
+
+# Prediction
+
+df_test['target'] = model.predict(X_test_TV)
+df_pred = df_test[['id', 'target']]
+df_pred.to_csv('submission.csv', index=False)
